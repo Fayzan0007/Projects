@@ -1,0 +1,263 @@
+% A 2-channel FDM sysem carrying 2 DSB-AM voice signals
+clc;
+clear all;
+close all;
+
+%% Given information 
+Fs=16000;
+ch=1;
+nbits=16;%number of bits
+datatype='double';
+Tsec=10;
+
+
+%% Recording of voice messages
+disp('The voice message will be recorded for 10 seconds.')
+pause(1);
+
+%For message 1 m1(t)
+
+recorder=audiorecorder(Fs,nbits,ch);
+disp('For m1(t)')
+disp('PLease start talking....')
+recordblocking(recorder,Tsec);
+disp('End of Recording 1.');
+disp('The m1(t) message signal is saved');
+m1t=getaudiodata(recorder,datatype);
+audiowrite('m1(t).wav',m1t,Fs);
+pause(1);
+
+%For message 2 m2(t)
+recorder=audiorecorder(Fs,nbits,ch);
+disp('For m2(t)')
+disp('PLease start talking....')
+recordblocking(recorder,Tsec);
+disp('End of Recording.');
+disp('The m2(t) message signal is saved');
+m2t=getaudiodata(recorder,datatype);
+audiowrite('m2(t).wav',m2t,Fs);
+
+%% ploting and playing the audio messages 
+
+%For message 1 m1(t)
+disp('Ploting and playing the audio message 1 m1(t)')
+m=audioread('m1(t).wav');
+t1=linspace(0,length(m)/Fs,length(m));
+N=Fs*100;
+M=fft(m,N);%converting to frequecny domain
+M=M/Fs;
+fn=[0:1/N:1-1/N]*Fs-Fs/2;
+figure(1)
+subplot(3,1,1)
+plot(m1t,'g');
+xlabel('Number of Samples');
+ylabel('Message Signal 1');
+title('Plot of Message 1 m1(t)');
+
+subplot(3,1,2)
+plot(t1,m,'r');
+xlabel('Time (seconds)');
+ylabel('Amplitude')
+title('Plot of Message 1 m1(t) in time domain.');
+
+subplot(3,1,3)
+plot(fn,abs(fftshift(M)),'y');
+xlabel('Frequency (Hz)');
+ylabel('Amplitude');
+title('Frequency spectrum of Message 1 m1(t).');
+sound(m,Fs);
+pause(10);
+
+
+%For message 2 m2(t)
+disp('Ploting and playing the audio message 2 m2(t)')
+m1=audioread('m2(t).wav');
+t1=linspace(0,length(m1)/Fs,length(m));
+M1=fft(m1,N);
+M1=M1/Fs;
+fn=[0:1/N:1-1/N]*Fs-Fs/2;
+figure(2)
+subplot(3,1,1)
+plot(m2t,'m');
+xlabel('Number of Samples');
+ylabel('Message Signal 2');
+title('Plot of Message 2 m2(t)');
+
+subplot(3,1,2)
+plot(t1,m1,'k');
+xlabel('Time(seconds)');
+ylabel('Amplitude')
+title('Plot of Message 2 m2(t) in time domain.');
+
+subplot(3,1,3)
+plot(fn,abs(fftshift(M1)),'b');
+xlabel('Frequency (Hz)');
+ylabel('Amplitude');
+title('Frequency spectrum of Message 2 m2(t).');
+sound(m1,Fs);
+pause(10)
+
+%% Lowpass filter
+
+fcut = 4000;%Given
+ncut = N*fcut/Fs;
+
+%For message 1 m1(t)
+G= ones(N,1); 
+H=zeros(1,ncut);
+H=G((N/2)-ncut+1:N/2);
+H=G((N/2)+1:N/2+ncut);
+Unfiltered1 =M.*G;
+
+figure(3)
+subplot(2,1,1)
+plot(fn, abs(fftshift(Unfiltered1)));
+title('Frequency spectrum of message 1 m1(t) after passing through LPF1.');
+
+%For message 2 m2(t)
+
+Unfiltered2 =M1.*G;
+subplot(2,1,2)
+plot(fn, abs(fftshift(Unfiltered2)));
+title('Frequency spectrum of message 2 m2(t) after passing through LPF2.');
+
+
+%% Coverting filttered message 1 and 2 back to time domain form frequency domanin
+
+%For message 1 m1(t)
+fm1 = real(ifft(Unfiltered1))*Fs;
+disp('Playing audio of filtered message 1 m1(t)');
+sound(fm1,Fs)
+
+%For message 2 m2(t)
+pause(12)
+fm2 = real(ifft(Unfiltered2))*Fs;
+disp('Playing audio of filtered message 2 m2(t)');
+sound(fm2,Fs)
+pause(10)
+
+%% Modulation
+to = 10;
+t1 = linspace(0,to,N); 
+fc1 = 125*1000; %1+9+0+1+0+5+0+0+0+8+1+9+0+1+0+5+0+0+7......=125
+fmn = [0:1/N:1-1/N]*fc1-fc1/2;
+
+%For message 1 m1(t)
+
+c1 = cos(2*pi*fc1*t1); 
+a1 = fm1.*c1';
+A1 = fft(a1, N); 
+A1 = A1/fc1;
+
+figure(4)
+subplot(2,1,1)
+plot(fmn, abs(fftshift(A1))); 
+title('Frequency spectrum of the modulated message 1 m1(t)');
+
+%For message 2 m2(t)
+
+fc2 = 250*1000; %125*2=250
+c2 = cos(2*pi*fc2*t1); 
+a2 = fm2.*c2';
+A2 = fft(a2, N); 
+A2 = A2/fc2;
+subplot(2,1,2)
+plot(fmn, abs(fftshift(A2))); 
+title('Frequency spectrum of the modulated message 2 m2(t)');
+
+%% generating senders output
+
+a12=a1+a2;
+A12 = fft(a12, N); 
+A12 = A12/fc1;
+
+figure(5)
+plot(fmn, abs(fftshift(A12))); 
+xlabel('Frequecny HZ)');
+ylabel('Amplitude');
+
+title('Frequency spectrum of the modulated m1(t)+m2(t)');
+
+%% bandpass filter
+
+%For message 1 m1(t)
+
+Unnfilteredf1 = A12.*G;
+
+figure(6)
+subplot(2,1,1)
+plot(fmn, abs(fftshift(Unnfilteredf1)));
+xlabel('Frequecny(HZ)');
+ylabel('Amplitude');
+title('Modulated message 1 m1(t) after passing through BPF1');
+
+%For message 2 m2(t)
+Unnfilteredf2 = A12.*G;
+figure(6)
+subplot(2,1,2)
+plot(fmn, abs(fftshift(Unnfilteredf2)));
+xlabel('Frequecny(in HZ)');
+ylabel('absolute value');
+title('Modulated message 2 after going through BPF2');
+%% Reconstructing messages from modulated signal
+
+%For message 1 m1(t)
+
+r_m1t=real(ifft(Unnfilteredf1))*fc1;
+r_m1t=r_m1t.*c1';
+r_m1=r_m1t;
+r_m1t= fft(r_m1t,N);
+r_m1t = r_m1t/fc1;
+
+figure(7)
+subplot(2,1,1)
+plot(fmn, abs(fftshift(r_m1t)));
+xlabel('Frequecny(HZ)');
+ylabel('Amplitude');
+title('Frequency spectrum of Message 1 m1(t) at the receiving end.');
+disp('Playing reconstructed audio of Message 1 m1(t)');
+sound(r_m1,Fs)
+pause(10)
+
+%For message 2 m2(t)
+r_m2t=real(ifft(Unnfilteredf2))*fc2;
+r_m2t=r_m2t.*c2';
+r_m2=r_m2t;
+r_m2t= fft(r_m2t,N);
+r_m2t = r_m2t/fc2;
+subplot(2,1,2)
+plot(fmn, abs(fftshift(r_m2t))); 
+xlabel('Frequecny(HZ)');
+ylabel('Amplitude');
+title('Frequency spectrum of Message 2 m2(t) at the receiving end.');
+disp('Playing reconstructed audio of Message 2 m2(t)');
+sound(r_m2,Fs)
+pause(10)
+
+%% Tne demodulated signal after passing through the LPF.
+
+
+%For message 1 m1(t)
+Ufilteredr1 =r_m1t.*G;
+figure(😎
+subplot(2,1,1)
+plot(fn, abs(fftshift(Ufilteredr1)));
+title('Frequency spectrum of demodulated m1(t) after passing through LPF3.');
+
+%For message 2 m2(t)
+Ufilteredr2=r_m2t.*G;
+subplot(2,1,2)
+plot(fn, abs(fftshift(Ufilteredr2)));
+title('Frequency spectrum of demodulated m2(t) after passing through LPF4.');
+
+
+%% The final audio Messages of Message 1 and Message 2 at the receiving end
+
+m1r = real(ifft(Ufilteredr1))*Fs;
+disp('Playing demodulated and filterd audio of Message 1 m1(t)');
+sound(m1r,Fs)
+pause(10)
+m2r = real(ifft(Ufilteredr2))*Fs;
+disp('Playing demodulated and filterd audio of Message 2 m2(t)');
+sound(m2r,Fs)
+pause(10)
